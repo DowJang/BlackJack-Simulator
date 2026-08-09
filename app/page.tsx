@@ -7,7 +7,7 @@ import {
 } from "./blackjack";
 import { playCard, playCardBurst, playChip, playLose, playPush, playWin } from "./sound";
 
-const CHIP_PRESETS = [1, 5, 25, 100];
+const CHIP_PRESETS = [1, 5, 10, 25, 50, 100];
 
 const ACTION_LABELS: Record<Action, string> = {
   hit: "HIT", stand: "STAND", double: "DOUBLE", split: "SPLIT", surrender: "SURRENDER",
@@ -92,7 +92,7 @@ export default function Home() {
   const [statsOpen, setStatsOpen] = useState(false);
   const [dealing, setDealing] = useState(false);
   const [betInput, setBetInput] = useState(() => String(state.baseBet));
-  const [popup, setPopup] = useState<{ key: number; title: string; subtitle: string; tone: "win" | "lose" | "push" } | null>(null);
+  const [popup, setPopup] = useState<{ key: number; title: string; subtitle: string; tone: "win" | "lose" | "push"; dealerTotal: number } | null>(null);
   const prevRounds = useRef(0);
   const dealingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const popupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -113,11 +113,12 @@ export default function Home() {
     if (!last) return;
     const { tone, title } = roundOutcome(last);
     const subtitle = last.delta > 0 ? `+${last.delta.toFixed(1)}u` : last.delta < 0 ? `${last.delta.toFixed(1)}u` : "베팅 반환";
+    const dealerTotal = handValue(state.dealer).total;
     if (sound) { if (tone === "win") playWin(); else if (tone === "lose") playLose(); else playPush(); }
-    setPopup({ key: state.stats.rounds, title, subtitle, tone });
+    setPopup({ key: state.stats.rounds, title, subtitle, tone, dealerTotal });
     if (popupTimer.current) clearTimeout(popupTimer.current);
     popupTimer.current = setTimeout(() => setPopup(null), 1700);
-  }, [state.stats.rounds, state.history, sound]);
+  }, [state.stats.rounds, state.history, state.dealer, sound]);
 
   useEffect(() => () => {
     if (dealingTimer.current) clearTimeout(dealingTimer.current);
@@ -141,9 +142,9 @@ export default function Home() {
     if (sound) playChip();
     setState((current) => updateBet(current, amount));
   }
-  function quickBet(amount: number) {
+  function addChip(amount: number) {
     if (sound) playChip();
-    setState((current) => updateBet(current, amount));
+    setState((current) => updateBet(current, current.baseBet + amount));
   }
 
   return (
@@ -189,6 +190,7 @@ export default function Home() {
             </div>
             {popup && (
               <div key={popup.key} className={`result-popup ${popup.tone}`}>
+                <em>DEALER {popup.dealerTotal}</em>
                 <strong>{popup.title}</strong>
                 <span>{popup.subtitle}</span>
               </div>
@@ -243,10 +245,11 @@ export default function Home() {
                   <button
                     key={amount}
                     type="button"
-                    className={`chip-preset chip-${amount} ${state.baseBet === amount ? "active" : ""}`}
-                    disabled={state.phase === "player"}
-                    onClick={() => quickBet(amount)}
-                  >{amount}</button>
+                    className={`chip-preset chip-${amount}`}
+                    disabled={state.phase === "player" || state.baseBet >= state.bankroll}
+                    onClick={() => addChip(amount)}
+                    aria-label={`${amount} 유닛 칩 추가`}
+                  >+{amount}</button>
                 ))}
               </div>
               <span>1 unit = ₩50,000</span>

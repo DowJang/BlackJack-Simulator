@@ -412,6 +412,7 @@ export function performAction(source: GameState, action: Action): GameState {
 export function updateBet(state: GameState, bet: number): GameState {
   if (state.phase === "player") return state;
   if (!Number.isFinite(bet)) return state;
-  const safe = Math.round(Math.max(1, Math.min(500, bet)) * 4) / 4;
+  const cap = Math.max(1, Math.min(500, state.bankroll));
+  const safe = Math.round(Math.max(1, Math.min(cap, bet)) * 4) / 4;
   return { ...state, baseBet: safe, message: `기본 베팅을 ${safe} 유닛으로 설정했습니다.` };
 }
