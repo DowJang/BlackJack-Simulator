@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Action, Card as CardType, GameState, Hand, allowedActions, basicDecision,
   decisionReason, handValue, initialState, performAction, startRound, updateBet,
 } from "./blackjack";
+import { playCard, playCardBurst, playChip, playLose, playPush, playWin } from "./sound";
+
+const CHIP_PRESETS = [1, 5, 25, 100];
 
 const ACTION_LABELS: Record<Action, string> = {
   hit: "HIT", stand: "STAND", double: "DOUBLE", split: "SPLIT", surrender: "SURRENDER",
@@ -81,14 +84,61 @@ export default function Home() {
   const [advisorOpen, setAdvisorOpen] = useState(true);
   const [sound, setSound] = useState(true);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [dealing, setDealing] = useState(false);
+  const [betInput, setBetInput] = useState(() => String(state.baseBet));
+  const [popup, setPopup] = useState<{ key: number; title: string; subtitle: string; tone: "win" | "lose" | "push" } | null>(null);
+  const prevRounds = useRef(0);
+  const dealingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const popupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allowed = useMemo(() => allowedActions(state), [state]);
   const remaining = state.shoe.length ? state.shoe.length - state.dealt : 416;
   const penetration = state.shoe.length ? Math.round((state.dealt / state.cutAt) * 100) : 0;
   const sessionProgress = Math.min(100, (state.stats.rounds / 2100) * 100);
   const profit = state.bankroll - state.startBankroll;
+  const displayRound = state.stats.rounds + (state.phase === "player" ? 1 : 0);
 
-  function act(action: Action) { setState((current) => performAction(current, action)); }
-  function deal() { setState((current) => startRound(current)); }
+  useEffect(() => { setBetInput(String(state.baseBet)); }, [state.baseBet]);
+
+  useEffect(() => {
+    if (state.stats.rounds === prevRounds.current) return;
+    prevRounds.current = state.stats.rounds;
+    const last = state.history[0];
+    if (!last) return;
+    const tone: "win" | "lose" | "push" = last.delta > 0 ? "win" : last.delta < 0 ? "lose" : "push";
+    const title = last.result.includes("BLACKJACK") ? "BLACKJACK!" : tone === "win" ? "WIN" : tone === "lose" ? "LOSE" : "PUSH";
+    const subtitle = last.delta > 0 ? `+${last.delta.toFixed(1)}u` : last.delta < 0 ? `${last.delta.toFixed(1)}u` : "베팅 반환";
+    if (sound) { if (tone === "win") playWin(); else if (tone === "lose") playLose(); else playPush(); }
+    setPopup({ key: state.stats.rounds, title, subtitle, tone });
+    if (popupTimer.current) clearTimeout(popupTimer.current);
+    popupTimer.current = setTimeout(() => setPopup(null), 1700);
+  }, [state.stats.rounds, state.history, sound]);
+
+  useEffect(() => () => {
+    if (dealingTimer.current) clearTimeout(dealingTimer.current);
+    if (popupTimer.current) clearTimeout(popupTimer.current);
+  }, []);
+
+  function act(action: Action) {
+    if (sound && (action === "hit" || action === "double")) playCard();
+    setState((current) => performAction(current, action));
+  }
+  function deal() {
+    if (sound) playCardBurst(4);
+    setDealing(true);
+    if (dealingTimer.current) clearTimeout(dealingTimer.current);
+    dealingTimer.current = setTimeout(() => setDealing(false), 650);
+    setState((current) => startRound(current));
+  }
+  function commitBet(value: string) {
+    const amount = parseFloat(value);
+    if (Number.isNaN(amount)) { setBetInput(String(state.baseBet)); return; }
+    if (sound) playChip();
+    setState((current) => updateBet(current, amount));
+  }
+  function quickBet(amount: number) {
+    if (sound) playChip();
+    setState((current) => updateBet(current, amount));
+  }
 
   return (
     <main className="app-shell">
@@ -112,6 +162,13 @@ export default function Home() {
 
           <div className="casino-table">
             <div className="felt-rings" />
+            <div className="round-badge"><span>ROUND</span><strong>{displayRound ? `#${displayRound.toString().padStart(3, "0")}` : "—"}</strong></div>
+            <div className={`dealer-rail ${dealing ? "dealing" : ""}`} aria-hidden="true">
+              <div className="rail-shoe" />
+              <div className="rail-arm rail-arm-left"><span className="sleeve" /><span className="cuff" /><span className="hand" /></div>
+              <div className="rail-arm rail-arm-right"><span className="sleeve" /><span className="cuff" /><span className="hand" /></div>
+              <div className="rail-chips"><i /><i /><i /></div>
+            </div>
             <div className="table-rule"><span>BLACKJACK PAYS 3 TO 2</span><small>DEALER MUST HIT SOFT 17</small></div>
             <div className="dealer-zone">
               <div className="dealer-label"><span className="dealer-avatar">D</span><div><strong>DEALER</strong><small>{state.dealer.length ? (state.dealerRevealed ? handValue(state.dealer).total : handValue([state.dealer[0]]).total) : "STANDS ON HARD 17"}</small></div></div>
@@ -120,6 +177,12 @@ export default function Home() {
                 {!state.dealer.length && <div className="card-placeholder" />}
               </div>
             </div>
+            {popup && (
+              <div key={popup.key} className={`result-popup ${popup.tone}`}>
+                <strong>{popup.title}</strong>
+                <span>{popup.subtitle}</span>
+              </div>
+            )}
 
             {state.seats[0] && <SeatView seat={state.seats[0]} position="left-top" />}
             {state.seats[1] && <SeatView seat={state.seats[1]} position="left-bottom" />}
@@ -142,7 +205,40 @@ export default function Home() {
                 <button className="danger" onClick={() => act("surrender")} disabled={!allowed.surrender}><span className="button-icon">½</span><strong>SURRENDER</strong><small>절반 포기</small></button>
               </>}
             </div>
-            <div className="bet-block"><small>BET / HAND</small><div className="bet-stepper"><button onClick={() => setState((s) => updateBet(s, s.baseBet - 0.25))} disabled={state.phase === "player"}>−</button><strong>{state.baseBet}<span>u</span></strong><button onClick={() => setState((s) => updateBet(s, s.baseBet + 0.25))} disabled={state.phase === "player"}>＋</button></div><span>1 unit = ₩50,000</span></div>
+            <div className="bet-block">
+              <small>BET / HAND</small>
+              <div className="bet-input-row">
+                <input
+                  className="bet-input"
+                  type="number"
+                  inputMode="decimal"
+                  min={1}
+                  max={500}
+                  step={0.25}
+                  value={betInput}
+                  disabled={state.phase === "player"}
+                  onChange={(event) => setBetInput(event.target.value)}
+                  onBlur={(event) => commitBet(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") { commitBet(event.currentTarget.value); event.currentTarget.blur(); }
+                  }}
+                  aria-label="베팅 금액 직접 입력"
+                />
+                <span>u</span>
+              </div>
+              <div className="chip-row">
+                {CHIP_PRESETS.map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    className={`chip-preset chip-${amount} ${state.baseBet === amount ? "active" : ""}`}
+                    disabled={state.phase === "player"}
+                    onClick={() => quickBet(amount)}
+                  >{amount}</button>
+                ))}
+              </div>
+              <span>1 unit = ₩50,000</span>
+            </div>
           </div>
         </div>
 

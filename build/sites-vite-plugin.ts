@@ -29,7 +29,9 @@ export function sites(): Plugin {
       const hostingConfig = resolve(root, ".openai", "hosting.json");
       const drizzleSource = resolve(root, "drizzle");
 
-      await rm(outputDirectory, { recursive: true, force: true });
+      // maxRetries/retryDelay work around transient EBUSY from cloud-sync
+      // clients (Dropbox/OneDrive) holding a handle on the directory mid-sync.
+      await rm(outputDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 150 });
       await mkdir(outputDirectory, { recursive: true });
 
       if (await exists(hostingConfig)) {

@@ -1,15 +1,4 @@
 {
-  "../../../../../Dropbox/BlackJack Simulator/node_modules/vinext/dist/shims/layout-segment-context.js": {
-    "file": "_next/static/chunks/layout-segment-context-BA2MKBg_.js",
-    "name": "layout-segment-context",
-    "src": "../../../../../Dropbox/BlackJack Simulator/node_modules/vinext/dist/shims/layout-segment-context.js",
-    "isDynamicEntry": true,
-    "imports": [
-      "_rolldown-runtime-C60lm6uB.js",
-      "virtual:vinext-app-browser-entry",
-      "_framework-BgSIrAUN.js"
-    ]
-  },
   "_framework-BgSIrAUN.js": {
     "file": "_next/static/chunks/framework-BgSIrAUN.js",
     "name": "framework",
@@ -22,7 +11,7 @@
     "name": "rolldown-runtime"
   },
   "app/page.tsx": {
-    "file": "_next/static/chunks/page-RuXYTbUC.js",
+    "file": "_next/static/chunks/page-BUEPg9QU.js",
     "name": "page",
     "src": "app/page.tsx",
     "isDynamicEntry": true,
@@ -31,8 +20,19 @@
       "_framework-BgSIrAUN.js"
     ]
   },
+  "node_modules/vinext/dist/shims/layout-segment-context.js": {
+    "file": "_next/static/chunks/layout-segment-context-B3N4jD9j.js",
+    "name": "layout-segment-context",
+    "src": "node_modules/vinext/dist/shims/layout-segment-context.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-C60lm6uB.js",
+      "virtual:vinext-app-browser-entry",
+      "_framework-BgSIrAUN.js"
+    ]
+  },
   "virtual:vinext-app-browser-entry": {
-    "file": "_next/static/chunks/index-DlOZdXEC.js",
+    "file": "_next/static/chunks/index-p6OiJCrr.js",
     "name": "index",
     "src": "virtual:vinext-app-browser-entry",
     "isEntry": true,
@@ -41,9 +41,9 @@
       "_framework-BgSIrAUN.js"
     ],
     "dynamicImports": [
-      "../../../../../Dropbox/BlackJack Simulator/node_modules/vinext/dist/shims/layout-segment-context.js",
-      "app/page.tsx",
-      "virtual:vinext-app-browser-entry"
+      "virtual:vinext-app-browser-entry",
+      "node_modules/vinext/dist/shims/layout-segment-context.js",
+      "app/page.tsx"
     ]
   }
 }
