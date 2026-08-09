@@ -13,6 +13,12 @@ const ACTION_LABELS: Record<Action, string> = {
   hit: "HIT", stand: "STAND", double: "DOUBLE", split: "SPLIT", surrender: "SURRENDER",
 };
 
+function roundOutcome(item: { result: string; delta: number }): { tone: "win" | "lose" | "push"; title: string } {
+  const tone: "win" | "lose" | "push" = item.delta > 0 ? "win" : item.delta < 0 ? "lose" : "push";
+  const title = item.result.includes("BLACKJACK") ? "BLACKJACK!" : tone === "win" ? "WIN" : tone === "lose" ? "LOSE" : "PUSH";
+  return { tone, title };
+}
+
 function Card({ card, hidden = false, index = 0 }: { card: CardType; hidden?: boolean; index?: number }) {
   const red = card.suit === "♥" || card.suit === "♦";
   return (
@@ -96,6 +102,7 @@ export default function Home() {
   const sessionProgress = Math.min(100, (state.stats.rounds / 2100) * 100);
   const profit = state.bankroll - state.startBankroll;
   const displayRound = state.stats.rounds + (state.phase === "player" ? 1 : 0);
+  const dealerOutcome = state.phase === "settled" && state.history[0] ? roundOutcome(state.history[0]) : null;
 
   useEffect(() => { setBetInput(String(state.baseBet)); }, [state.baseBet]);
 
@@ -104,8 +111,7 @@ export default function Home() {
     prevRounds.current = state.stats.rounds;
     const last = state.history[0];
     if (!last) return;
-    const tone: "win" | "lose" | "push" = last.delta > 0 ? "win" : last.delta < 0 ? "lose" : "push";
-    const title = last.result.includes("BLACKJACK") ? "BLACKJACK!" : tone === "win" ? "WIN" : tone === "lose" ? "LOSE" : "PUSH";
+    const { tone, title } = roundOutcome(last);
     const subtitle = last.delta > 0 ? `+${last.delta.toFixed(1)}u` : last.delta < 0 ? `${last.delta.toFixed(1)}u` : "베팅 반환";
     if (sound) { if (tone === "win") playWin(); else if (tone === "lose") playLose(); else playPush(); }
     setPopup({ key: state.stats.rounds, title, subtitle, tone });
@@ -152,7 +158,7 @@ export default function Home() {
         </nav>
       </header>
 
-      <section className={`game-layout ${advisorOpen ? "with-advisor" : ""}`}>
+      <section className="game-layout">
         <div className="table-column">
           <div className="table-meta">
             <div><span className="meta-icon">▰</span><p><small>SHOE</small><strong>{remaining} CARDS</strong></p></div>
@@ -171,7 +177,11 @@ export default function Home() {
             </div>
             <div className="table-rule"><span>BLACKJACK PAYS 3 TO 2</span><small>DEALER MUST HIT SOFT 17</small></div>
             <div className="dealer-zone">
-              <div className="dealer-label"><span className="dealer-avatar">D</span><div><strong>DEALER</strong><small>{state.dealer.length ? (state.dealerRevealed ? handValue(state.dealer).total : handValue([state.dealer[0]]).total) : "STANDS ON HARD 17"}</small></div></div>
+              <div className="dealer-label">
+                <span className="dealer-avatar">D</span>
+                <div><strong>DEALER</strong><small>{state.dealer.length ? (state.dealerRevealed ? handValue(state.dealer).total : handValue([state.dealer[0]]).total) : "STANDS ON HARD 17"}</small></div>
+                {dealerOutcome && <span className={`dealer-result ${dealerOutcome.tone}`}>{dealerOutcome.tone === "win" ? "WIN" : dealerOutcome.tone === "lose" ? "LOSE" : "PUSH"}</span>}
+              </div>
               <div className="dealer-hand">
                 {state.dealer.map((card, index) => <Card key={card.id} card={card} hidden={!state.dealerRevealed && index === 1} index={index} />)}
                 {!state.dealer.length && <div className="card-placeholder" />}
@@ -189,6 +199,8 @@ export default function Home() {
             {state.seats[2] && <SeatView seat={state.seats[2]} position="right-top" />}
             {state.seats[3] && <SeatView seat={state.seats[3]} position="right-bottom" />}
             {state.seats[4] && <SeatView seat={state.seats[4]} position="user" activeHand={state.phase === "player" ? state.currentHand : -1} />}
+
+            {advisorOpen && <Advisor state={state} onClose={() => setAdvisorOpen(false)} />}
 
             {state.lastShuffle && state.stats.rounds === 0 && <div className="shuffle-toast">↻ NEW SHOE SHUFFLED</div>}
             <div className="table-message">{state.message}</div>
@@ -241,8 +253,6 @@ export default function Home() {
             </div>
           </div>
         </div>
-
-        {advisorOpen && <Advisor state={state} onClose={() => setAdvisorOpen(false)} />}
       </section>
 
       {statsOpen && <div className="stats-drawer">
